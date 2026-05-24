@@ -102,10 +102,9 @@ module.exports = async (req, res) => {
       'billing_address[city]':          customer.address.city,
       'billing_address[zip]':           customer.address.zip,
       'billing_address[country]':       customer.address.country,
-      'payment_method[type]':           'card',
-      'payment_method[gateway]':        'stripe',
-      'payment_method[gateway_account_id]': process.env.CHARGEBEE_GATEWAY_ID,
-      'payment_method[tmp_token]':      paymentMethodId,
+'payment_method[type]':           'card',
+'payment_method[gateway_account_id]': process.env.CHARGEBEE_GATEWAY_ID,
+'payment_method[tmp_token]':      paymentMethodId,
       // Store consent on customer record for audit trail
       'meta_data': JSON.stringify({
         authorized_variable_billing: consent.authorizedVariableBilling,
