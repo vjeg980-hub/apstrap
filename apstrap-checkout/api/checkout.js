@@ -1,11 +1,9 @@
 // ============================================================
 // AP STRAP — Vercel Serverless Backend
-// Chargebee customer + subscription + Stripe processing
+// Chargebee Product Catalog 2.0 + Stripe processing
 // ============================================================
 
 const https = require('https');
-
-// ── Helpers ─────────────────────────────────────────────────
 
 function chargebeeRequest(method, path, data) {
   return new Promise((resolve, reject) => {
@@ -32,12 +30,12 @@ function chargebeeRequest(method, path, data) {
         try {
           const parsed = JSON.parse(raw);
           if (res.statusCode >= 400) {
-            reject(new Error(parsed.message || 'Chargebee error'));
+            reject(new Error(parsed.message || JSON.stringify(parsed)));
           } else {
             resolve(parsed);
           }
         } catch {
-          reject(new Error('Invalid Chargebee response'));
+          reject(new Error('Invalid Chargebee response: ' + raw));
         }
       });
     });
@@ -48,24 +46,15 @@ function chargebeeRequest(method, path, data) {
   });
 }
 
-// ── Main handler ─────────────────────────────────────────────
-
 module.exports = async (req, res) => {
 
-  // CORS headers — update origin to your actual domain
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // ── Parse body ─────────────────────────────────────────────
   let body;
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -73,86 +62,59 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  const {
-    paymentMethodId,
-    customer,
-    consent,
-  } = body;
+  const { paymentMethodId, customer, consent } = body;
 
-  // ── Validate required fields ───────────────────────────────
-  if (!paymentMethodId)              return res.status(400).json({ error: 'Missing payment method' });
-  if (!customer?.email)              return res.status(400).json({ error: 'Missing customer email' });
+  if (!paymentMethodId) return res.status(400).json({ error: 'Missing payment method' });
+  if (!customer?.email) return res.status(400).json({ error: 'Missing customer email' });
   if (!consent?.authorizedVariableBilling) return res.status(400).json({ error: 'Billing authorization required' });
-  if (!consent?.agreedToTerms)       return res.status(400).json({ error: 'Terms agreement required' });
+  if (!consent?.agreedToTerms) return res.status(400).json({ error: 'Terms agreement required' });
 
   try {
 
-    // ── STEP 1: Create Chargebee customer ─────────────────────
-    // Card is stored in Chargebee vault via Stripe gateway
-    // Tokens stored in Chargebee — NOT Stripe alone
-    const customerData = {
-      'first_name':                     customer.firstName,
-      'last_name':                      customer.lastName,
-      'email':                          customer.email,
-      'phone':                          customer.phone || '',
-      'billing_address[first_name]':    customer.firstName,
-      'billing_address[last_name]':     customer.lastName,
-      'billing_address[line1]':         customer.address.line1,
-      'billing_address[line2]':         customer.address.line2 || '',
-      'billing_address[city]':          customer.address.city,
-      'billing_address[zip]':           customer.address.zip,
-      'billing_address[country]':       customer.address.country,
-'payment_method[type]':           'card',
-'payment_method[gateway_account_id]': process.env.CHARGEBEE_GATEWAY_ID,
-'payment_method[tmp_token]':      paymentMethodId,
-      // Store consent on customer record for audit trail
+    // ── STEP 1: Create Chargebee customer with vaulted card ───
+    const cbCustomer = await chargebeeRequest('POST', '/customers', {
+      'first_name':                         customer.firstName,
+      'last_name':                          customer.lastName,
+      'email':                              customer.email,
+      'phone':                              customer.phone || '',
+      'billing_address[first_name]':        customer.firstName,
+      'billing_address[last_name]':         customer.lastName,
+      'billing_address[line1]':             customer.address.line1,
+      'billing_address[line2]':             customer.address.line2 || '',
+      'billing_address[city]':              customer.address.city,
+      'billing_address[zip]':              customer.address.zip,
+      'billing_address[country]':           customer.address.country,
+      'payment_method[type]':               'card',
+      'payment_method[gateway_account_id]': process.env.CHARGEBEE_GATEWAY_ID,
+      'payment_method[tmp_token]':          paymentMethodId,
       'meta_data': JSON.stringify({
         authorized_variable_billing: consent.authorizedVariableBilling,
         agreed_to_terms:             consent.agreedToTerms,
         authorized_at:               consent.authorizedAt,
         marketing_opt_in:            consent.marketingOptIn || false,
       }),
-    };
+    });
 
-    const cbCustomer = await chargebeeRequest(
-      'POST',
-      '/customers',
-      customerData
-    );
+    const customerId      = cbCustomer.customer.id;
+    const paymentSourceId = cbCustomer.customer.primary_payment_source_id;
 
-    const customerId = cbCustomer.customer.id;
-
-    // ── STEP 2: Charge $54.99 for AP Strap (one-time) ────────
-    // This creates an invoice and charges the stored card
-const chargeData = {
-  'customer_id':        customerId,
-  'currency_code':      'EUR',
-  'amount':             5499,
-  'description':        'AP Strap Conversion Band',
-};
-
-const invoice = await chargebeeRequest(
-  'POST',
-  '/invoices/charge',
-  chargeData
-);
+    // ── STEP 2: Charge for AP Strap using one-time invoice ────
+    // Product Catalog 2.0 uses /invoices/create_for_charge_items_and_charges
+    const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
+      'customer_id':                  customerId,
+      'charges[0][amount]':           5499,
+      'charges[0][description]':      'AP Strap Conversion Band',
+      'payment_source_id':            paymentSourceId,
+    });
 
     // ── STEP 3: Create free AP Club VIP subscription ──────────
-    // Price is $0 so no charge today
-    // Card is vaulted — future usage charges via Chargebee dashboard
-    const subscriptionData = {
-      'plan_id':                            'AP-Club-VIP',
-      'customer_id':                         customerId,
-      'payment_source_id':                   cbCustomer.customer.primary_payment_source_id,
-    };
+    // Product Catalog 2.0 uses /subscriptions endpoint with item_prices
+    const subscription = await chargebeeRequest('POST', '/subscriptions/create_for_customer', {
+      'customer_id':                    customerId,
+      'subscription_items[0][item_price_id]': 'AP-Club-VIP-EUR-Monthly',
+      'payment_source_id':              paymentSourceId,
+    });
 
-    const subscription = await chargebeeRequest(
-      'POST',
-      `/customers/${customerId}/subscriptions`,
-      subscriptionData
-    );
-
-    // ── STEP 4: Return success ────────────────────────────────
     return res.status(200).json({
       success:        true,
       customerId,
