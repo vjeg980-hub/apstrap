@@ -124,19 +124,18 @@ module.exports = async (req, res) => {
 
     // ── STEP 2: Charge $54.99 for AP Strap (one-time) ────────
     // This creates an invoice and charges the stored card
-    const chargeData = {
-      'customer_id':             customerId,
-      'currency_code': 'EUR',
-      'charges[0][amount]':      5499,   // cents
-      'charges[0][description]': 'AP Strap Conversion Band',
-      'charges[0][taxable]':     false,
-    };
+const chargeData = {
+  'customer_id':        customerId,
+  'currency_code':      'EUR',
+  'amount':             5499,
+  'description':        'AP Strap Conversion Band',
+};
 
-    const invoice = await chargebeeRequest(
-      'POST',
-      '/invoices/charge',
-      chargeData
-    );
+const invoice = await chargebeeRequest(
+  'POST',
+  '/invoices/charge',
+  chargeData
+);
 
     // ── STEP 3: Create free AP Club VIP subscription ──────────
     // Price is $0 so no charge today
