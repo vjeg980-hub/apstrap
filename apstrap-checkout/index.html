@@ -934,10 +934,14 @@ document.getElementById('checkoutForm').addEventListener('submit', async e => {
 
   try {
     // Step 1: Create Stripe PaymentMethod
-    const { paymentMethod, error: pmErr } = await stripe.createPaymentMethod({
-      type: 'card',
-      card,
-      billing_details: {
+const { token, error: pmErr } = await stripe.createToken(card, {
+  name: `${document.getElementById('firstName').value.trim()} ${document.getElementById('lastName').value.trim()}`,
+  address_line1: document.getElementById('address').value.trim(),
+  address_line2: document.getElementById('address2').value.trim(),
+  address_city: document.getElementById('city').value.trim(),
+  address_zip: document.getElementById('zip').value.trim(),
+  address_country: document.getElementById('country').value,
+});
         name:    `${document.getElementById('firstName').value.trim()} ${document.getElementById('lastName').value.trim()}`,
         email:   document.getElementById('email').value.trim(),
         phone:   document.getElementById('phone').value.trim() || undefined,
@@ -997,8 +1001,7 @@ document.getElementById('checkoutForm').addEventListener('submit', async e => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        paymentMethodId: paymentMethod.id,
-        planId:   PLAN_ID,
+paymentMethodId: token.id,        planId:   PLAN_ID,
         chargeId: CHARGE_ID,
         customer: {
           firstName: document.getElementById('firstName').value.trim(),
