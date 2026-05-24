@@ -993,7 +993,7 @@ document.getElementById('checkoutForm').addEventListener('submit', async e => {
     // D) Return { success: true } or { error: 'message' }
     // --------------------------------------------------------
 
-    const res  = await fetch('/api/checkout/ap-strap', {
+    const res = await fetch('https://theapstrap.com/api/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
