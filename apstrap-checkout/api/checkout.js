@@ -126,7 +126,7 @@ module.exports = async (req, res) => {
     // This creates an invoice and charges the stored card
     const chargeData = {
       'customer_id':             customerId,
-      'currency_code':           'USD',
+      'currency_code': 'EUR',
       'charges[0][amount]':      5499,   // cents
       'charges[0][description]': 'AP Strap Conversion Band',
       'charges[0][taxable]':     false,
