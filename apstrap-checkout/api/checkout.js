@@ -100,13 +100,13 @@ module.exports = async (req, res) => {
 
     // ── STEP 2: Charge for AP Strap using one-time invoice ────
     // Product Catalog 2.0 uses /invoices/create_for_charge_items_and_charges
-const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
-  'customer_id':                    customerId,
-  'charges[0][item_price_id]':      'AP-Strap-EUR',
-  'charges[0][quantity]':           1,
-  'payment_source_id':              paymentSourceId,
+const invoice = await chargebeeRequest('POST', '/invoices/charge', {
+  'customer_id':             customerId,
+  'amount':                  5499,
+  'description':             'AP Strap Conversion Band',
+  'payment_source_id':       paymentSourceId,
+  'currency_code':           'EUR',
 });
-
     // ── STEP 3: Create free AP Club VIP subscription ──────────
     // Product Catalog 2.0 uses /subscriptions endpoint with item_prices
     const subscription = await chargebeeRequest('POST', '/subscriptions/create_for_customer', {
