@@ -99,22 +99,25 @@ module.exports = async (req, res) => {
     const paymentSourceId = cbCustomer.customer.primary_payment_source_id;
 
     // ── STEP 2: Charge for AP Strap using one-time invoice ────
-    // Product Catalog 2.0 uses /invoices/create_for_charge_items_and_charges
-const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
-  'customer_id':                       customerId,
-  'payment_source_id':                 paymentSourceId,
-  'currency_code':                     'EUR',
-  'item_prices[item_price_id][0]':     'AP-Strap-EUR',
-  'item_prices[quantity][0]':          '1',
-});
+    // PC 2.0: /invoices/create_for_charge_items_and_charges with item_prices
+    const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
+      'customer_id':                   customerId,
+      'payment_source_id':             paymentSourceId,
+      'currency_code':                 'EUR',
+      'item_prices[item_price_id][0]': 'AP-Strap-EUR',
+      'item_prices[quantity][0]':      '1',
+    });
     // ── STEP 3: Create free AP Club VIP subscription ──────────
-    // Product Catalog 2.0 uses /subscriptions endpoint with item_prices
-const subscription = await chargebeeRequest('POST', '/subscriptions/create_for_customer', {
-  'customer_id':                              customerId,
-  'payment_source_id':                        paymentSourceId,
-  'subscription_items[item_price_id][0]':     'AP-Club-VIP-EUR-Monthly',
-  'subscription_items[quantity][0]':          '1',
-});
+    // PC 2.0: /customers/{id}/subscription_for_items (not create_for_customer)
+    const subscription = await chargebeeRequest(
+      'POST',
+      `/customers/${customerId}/subscription_for_items`,
+      {
+        'payment_source_id':                    paymentSourceId,
+        'subscription_items[item_price_id][0]': 'AP-Club-VIP-EUR-Monthly',
+        'subscription_items[quantity][0]':      '1',
+      }
+    );
     return res.status(200).json({
       success:        true,
       customerId,
