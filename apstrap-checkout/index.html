@@ -865,11 +865,10 @@ function validate() {
   setErr('email', 'emailErr', !emailOk);
   if (!emailOk) ok = false;
 
-  const cb1 = document.getElementById('authBilling').checked;
-  const cb2 = document.getElementById('authTerms').checked;
-  const cbErr = document.getElementById('checkboxErr');
-  if (!cb1 || !cb2) {
-    cbErr.textContent = 'Please agree to the billing authorization and terms to continue.';
+const cb2 = document.getElementById('authTerms').checked;
+const cbErr = document.getElementById('checkboxErr');
+if (!cb2) {
+  cbErr.textContent = 'Please agree to the terms to continue.';
     cbErr.style.display = 'block';
     ok = false;
   } else {
