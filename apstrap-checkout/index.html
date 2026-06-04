@@ -7,14 +7,6 @@
 <script src="https://js.stripe.com/v3/"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Apple Pay / Google Pay button */
-.express-pay-section { margin-bottom: 20px; }
-.express-pay-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--ink-60); text-align: center; margin-bottom: 10px; }
-#payment-request-button { width: 100%; min-height: 48px; border-radius: 100px; overflow: hidden; }
-.express-divider { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.express-divider hr { flex: 1; border: none; border-top: 1px solid var(--rule); }
-.express-divider span { font-size: 12px; color: var(--ink-30); white-space: nowrap; }
-  
 :root {
   --ink: #111;
   --ink-60: rgba(17,17,17,0.6);
@@ -234,12 +226,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
   </div>
 
   <form id="checkoutForm" novalidate>
-<!-- APPLE PAY / GOOGLE PAY -->
-<div class="express-pay-section" id="expressPaySection" style="display:none;">
-  <p class="express-pay-label">Express Checkout</p>
-  <div id="payment-request-button"></div>
-  <div class="express-divider"><hr><span>or pay by card</span><hr></div>
-</div>
+
     <!-- COLOUR -->
     <div class="section">
       <p class="section-head">Colour</p>
@@ -421,6 +408,11 @@ const paymentRequest = stripe.paymentRequest({
   requestPayerEmail: true,
 });
 
+const prButton = elements.create('paymentRequestButton', {
+  paymentRequest,
+  style: { paymentRequestButton: { type: 'buy', theme: 'dark', height: '48px' } }
+});
+
 paymentRequest.canMakePayment().then(result => {
   console.log('canMakePayment result:', result);
   if (result) {
@@ -428,18 +420,6 @@ paymentRequest.canMakePayment().then(result => {
     document.getElementById('expressPaySection').style.display = 'block';
   } else {
     console.log('Apple Pay not available - result was null');
-  }
-});
-
-const prButton = elements.create('paymentRequestButton', {
-  paymentRequest,
-  style: { paymentRequestButton: { type: 'buy', theme: 'dark', height: '48px' } }
-});
-
-paymentRequest.canMakePayment().then(result => {
-  if (result) {
-    prButton.mount('#payment-request-button');
-    document.getElementById('expressPaySection').style.display = 'block';
   }
 });
 
@@ -608,5 +588,6 @@ function openModal()  { document.getElementById('termsModal').classList.add('ope
 function closeModal() { document.getElementById('termsModal').classList.remove('open'); document.body.style.overflow=''; }
 document.getElementById('termsModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 </script>
+
 </body>
 </html>
