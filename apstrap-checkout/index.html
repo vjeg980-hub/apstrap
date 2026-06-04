@@ -152,6 +152,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
   .right{padding:28px 20px;max-height:none;}
   .fg.c2{grid-template-columns:1fr;}
 }
+
+  /* ── Express checkout ── */
+  .express-section{margin-bottom:20px;}
+  .express-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--ink-60);text-align:center;margin-bottom:10px;}
+  #payment-request-button{width:100%;min-height:48px;border-radius:100px;overflow:hidden;}
+  .express-divider{display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+  .express-divider hr{flex:1;border:none;border-top:1px solid var(--rule);}
+  .express-divider span{font-size:12px;color:var(--ink-30);white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -227,6 +235,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 
   <form id="checkoutForm" novalidate>
 
+<!-- ── EXPRESS CHECKOUT ── -->
+<div class="express-section" id="expressSection" style="display:none;">
+  <p class="express-label">Express Checkout</p>
+  <div id="payment-request-button"></div>
+  <div class="express-divider"><hr><span>or pay by card</span><hr></div>
+</div>
     <!-- COLOUR -->
     <div class="section">
       <p class="section-head">Colour</p>
@@ -395,41 +409,108 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <script>
-const stripe = Stripe('pk_live_51R4QM1F47kyO7cD9H8gK8tIQyMqlXK224HZO4hPipTWTdCKB5JAJ1iYhO5nz4Q3VDRPcakLhxUSqJLOvt38bhdgG00zaW0da1I');
+const stripe   = Stripe('pk_live_51R4QM1F47kyO7cD9H8gK8tIQyMqlXK224HZO4hPipTWTdCKB5JAJ1iYhO5nz4Q3VDRPcakLhxUSqJLOvt38bhdgG00zaW0da1I');
 const elements = stripe.elements();
 
-const card = elements.create('card', {
-  style: {
-    base: {
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-      fontSize: '14px',
-      color: '#111',
-      '::placeholder': { color: 'rgba(17,17,17,0.3)' }
-    },
-    invalid: { color: '#C0392B' }
-  },
-  hidePostalCode: true
+// ── APPLE PAY / GOOGLE PAY ──────────────────────────────────
+const paymentRequest = stripe.paymentRequest({
+  country:           'US',
+  currency:          'usd',
+  total:             { label: 'FLOWRA Dress', amount: 799 },
+  requestPayerName:  true,
+  requestPayerEmail: true,
 });
 
-card.mount('#card-element');
+const prButton = elements.create('paymentRequestButton', {
+  paymentRequest,
+  style: { paymentRequestButton: { type: 'buy', theme: 'dark', height: '48px' } },
+});
 
-card.on('focus', () => document.getElementById('cardWrap').classList.add('focused'));
-card.on('blur',  () => document.getElementById('cardWrap').classList.remove('focused'));
-card.on('change', e => {
-  const err  = document.getElementById('cardErr');
-  const wrap = document.getElementById('cardWrap');
-  if (e.error) {
-    err.textContent = e.error.message;
-    err.classList.add('show');
-    wrap.classList.add('err-state');
-  } else {
-    err.classList.remove('show');
-    wrap.classList.remove('err-state');
+paymentRequest.canMakePayment().then(result => {
+  if (result) {
+    prButton.mount('#payment-request-button');
+    document.getElementById('expressSection').style.display = 'block';
   }
 });
 
+paymentRequest.on('paymentmethod', async (ev) => {
+  try {
+    const pi = await createPaymentIntent(
+      ev.payerName  ? ev.payerName.split(' ')[0]           : '',
+      ev.payerName  ? ev.payerName.split(' ').slice(1).join(' ') : '',
+      ev.payerEmail || '',
+      '', '', '', '', '', 'US'
+    );
+    const { error, paymentIntent } = await stripe.confirmCardPayment(
+      pi.client_secret,
+      { payment_method: ev.paymentMethod.id },
+      { handleActions: false }
+    );
+    if (error) { ev.complete('fail'); throw new Error(error.message); }
+    ev.complete('success');
+    if (paymentIntent.status === 'requires_action') {
+      await stripe.confirmCardPayment(pi.client_secret);
+    }
+    showSuccess();
+  } catch (err) {
+    ev.complete('fail');
+    showError(err.message);
+  }
+});
+
+// ── CARD ────────────────────────────────────────────────────
+const card = elements.create('card', {
+  style: {
+    base:    { fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:'14px', color:'#111', '::placeholder':{ color:'rgba(17,17,17,0.3)' } },
+    invalid: { color:'#C0392B' },
+  },
+  hidePostalCode: true,
+});
+card.mount('#card-element');
+card.on('focus',  () => document.getElementById('cardWrap').classList.add('focused'));
+card.on('blur',   () => document.getElementById('cardWrap').classList.remove('focused'));
+card.on('change', e => {
+  const err  = document.getElementById('cardErr');
+  const wrap = document.getElementById('cardWrap');
+  if (e.error) { err.textContent = e.error.message; err.classList.add('show'); wrap.classList.add('err-state'); }
+  else          { err.classList.remove('show'); wrap.classList.remove('err-state'); }
+});
+
+// ── STATE ───────────────────────────────────────────────────
 let selectedColor = '';
 let selectedSize  = '';
+
+// ── HELPERS ─────────────────────────────────────────────────
+async function createPaymentIntent(fn, ln, email, phone, line1, line2, city, zip, country) {
+  const r = await fetch('https://apstrap.vercel.app/api/checkout', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      amount: 799, currency: 'usd',
+      customer: { firstName:fn, lastName:ln, email:email, phone:phone,
+        address:{ line1:line1, line2:line2, city:city, zip:zip, country:country } },
+      product: { color: selectedColor||'Not selected', size: selectedSize||'Not selected' },
+    }),
+  });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+function showSuccess() {
+  document.getElementById('checkoutForm').style.display = 'none';
+  document.getElementById('successScreen').classList.add('show');
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function showError(msg) {
+  const el  = document.getElementById('formMsg');
+  el.textContent = msg || 'Something went wrong. Please try again.';
+  el.className = 'msg error';
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = false;
+  btn.classList.remove('loading');
+}
 
 function selectColor(el, color) {
   document.querySelectorAll('.color-pill').forEach(p => p.classList.remove('active'));
@@ -467,108 +548,63 @@ function validate() {
   const ad = document.getElementById('address').value.trim();
   const ci = document.getElementById('city').value.trim();
   const zp = document.getElementById('zip').value.trim();
-  setErr('firstName','firstNameErr', !fn); if (!fn) ok = false;
-  setErr('lastName', 'lastNameErr',  !ln); if (!ln) ok = false;
-  setErr('address',  'addressErr',   !ad); if (!ad) ok = false;
-  setErr('city',     'cityErr',      !ci); if (!ci) ok = false;
-  setErr('zip',      'zipErr',       !zp); if (!zp) ok = false;
+  setErr('firstName','firstNameErr',!fn); if(!fn) ok=false;
+  setErr('lastName', 'lastNameErr', !ln); if(!ln) ok=false;
+  setErr('address',  'addressErr',  !ad); if(!ad) ok=false;
+  setErr('city',     'cityErr',     !ci); if(!ci) ok=false;
+  setErr('zip',      'zipErr',      !zp); if(!zp) ok=false;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
-  setErr('email', 'emailErr', !emailOk); if (!emailOk) ok = false;
+  setErr('email','emailErr',!emailOk); if(!emailOk) ok=false;
   const agreed = document.getElementById('authTerms').checked;
   const cbErr  = document.getElementById('checkboxErr');
-  if (!agreed) {
-    cbErr.textContent = 'Please agree to the terms to continue.';
-    cbErr.classList.add('show');
-    ok = false;
-  } else {
-    cbErr.classList.remove('show');
-  }
+  if (!agreed) { cbErr.textContent='Please agree to the terms to continue.'; cbErr.classList.add('show'); ok=false; }
+  else           cbErr.classList.remove('show');
   return ok;
 }
 
+// ── SUBMIT ──────────────────────────────────────────────────
 document.getElementById('checkoutForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!validate()) return;
-
   const btn = document.getElementById('submitBtn');
   const msg = document.getElementById('formMsg');
-  btn.disabled = true;
-  btn.classList.add('loading');
-  msg.className = 'msg';
-
+  btn.disabled = true; btn.classList.add('loading'); msg.className = 'msg';
   try {
-    const { token, error: tokenErr } = await stripe.createToken(card, {
-      name: document.getElementById('firstName').value.trim() + ' ' + document.getElementById('lastName').value.trim(),
-      address_line1:   document.getElementById('address').value.trim(),
-      address_line2:   document.getElementById('address2').value.trim() || undefined,
-      address_city:    document.getElementById('city').value.trim(),
-      address_zip:     document.getElementById('zip').value.trim(),
-      address_country: document.getElementById('country').value,
+    const fn      = document.getElementById('firstName').value.trim();
+    const ln      = document.getElementById('lastName').value.trim();
+    const email   = document.getElementById('email').value.trim();
+    const phone   = document.getElementById('phone').value.trim();
+    const line1   = document.getElementById('address').value.trim();
+    const line2   = document.getElementById('address2').value.trim();
+    const city    = document.getElementById('city').value.trim();
+    const zip     = document.getElementById('zip').value.trim();
+    const country = document.getElementById('country').value;
+
+    const pi = await createPaymentIntent(fn, ln, email, phone, line1, line2, city, zip, country);
+
+    const { error, paymentIntent } = await stripe.confirmCardPayment(pi.client_secret, {
+      payment_method: {
+        card,
+        billing_details: {
+          name: fn + ' ' + ln,
+          email,
+          phone: phone || undefined,
+          address: { line1, line2:line2||undefined, city, postal_code:zip, country },
+        },
+      },
+      setup_future_usage: 'off_session',
     });
 
-    if (tokenErr) throw new Error(tokenErr.message);
-    if (!token)   throw new Error('Could not create payment token. Please try again.');
-
-    const res = await fetch('https://apstrap.vercel.app/api/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paymentMethodId: token.id,
-        planId:   'FLOWRA-Club-EUR-Monthly',
-        chargeId: 'FLOWRA-Dress-EUR',
-        customer: {
-          firstName: document.getElementById('firstName').value.trim(),
-          lastName:  document.getElementById('lastName').value.trim(),
-          email:     document.getElementById('email').value.trim(),
-          phone:     document.getElementById('phone').value.trim(),
-          address: {
-            line1:   document.getElementById('address').value.trim(),
-            line2:   document.getElementById('address2').value.trim(),
-            city:    document.getElementById('city').value.trim(),
-            zip:     document.getElementById('zip').value.trim(),
-            country: document.getElementById('country').value,
-          },
-        },
-        product: { color: selectedColor, size: selectedSize },
-        consent: {
-          agreedToTerms: true,
-          authorizedAt:  new Date().toISOString(),
-          marketingOptIn: document.getElementById('marketing').checked,
-        },
-      }),
-    });
-
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-
-    if (data.requiresAction && data.clientSecret) {
-      const { error: confirmErr } = await stripe.confirmCardPayment(data.clientSecret);
-      if (confirmErr) throw new Error(confirmErr.message);
-    }
-
-    document.getElementById('checkoutForm').style.display = 'none';
-    document.getElementById('successScreen').classList.add('show');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
+    if (error) throw new Error(error.message);
+    showSuccess();
   } catch (err) {
-    msg.textContent = err.message || 'Something went wrong. Please try again or contact support@flowra.com';
-    msg.className = 'msg error';
-    btn.disabled = false;
-    btn.classList.remove('loading');
+    showError(err.message);
   }
 });
 
-function openModal()  {
-  document.getElementById('termsModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeModal() {
-  document.getElementById('termsModal').classList.remove('open');
-  document.body.style.overflow = '';
-}
-document.getElementById('termsModal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeModal();
-});
+function openModal()  { document.getElementById('termsModal').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeModal() { document.getElementById('termsModal').classList.remove('open'); document.body.style.overflow=''; }
+document.getElementById('termsModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 </script>
 
 </body>
