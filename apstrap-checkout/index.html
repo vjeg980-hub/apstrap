@@ -413,6 +413,7 @@ const stripe   = Stripe('pk_live_51R4QM1F47kyO7cD9H8gK8tIQyMqlXK224HZO4hPipTWTdC
 const elements = stripe.elements();
 
 // ── APPLE PAY / GOOGLE PAY ──────────────────────────────────
+// Create the PaymentRequest upfront so Apple Pay can show
 const paymentRequest = stripe.paymentRequest({
   country:           'US',
   currency:          'usd',
@@ -433,32 +434,59 @@ paymentRequest.canMakePayment().then(result => {
   }
 });
 
+// When Apple Pay fires — create PI on backend THEN confirm
 paymentRequest.on('paymentmethod', async (ev) => {
+  let clientSecret;
   try {
-    const pi = await createPaymentIntent(
-      ev.payerName  ? ev.payerName.split(' ')[0]           : '',
-      ev.payerName  ? ev.payerName.split(' ').slice(1).join(' ') : '',
-      ev.payerEmail || '',
-      '', '', '', '', '', 'US'
-    );
-    const { error, paymentIntent } = await stripe.confirmCardPayment(
-      pi.client_secret,
+    // Step 1: create PaymentIntent on backend
+    const r = await fetch('https://apstrap.vercel.app/api/checkout', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 799, currency: 'usd',
+        customer: {
+          firstName: ev.payerName ? ev.payerName.split(' ')[0] : '',
+          lastName:  ev.payerName ? ev.payerName.split(' ').slice(1).join(' ') : '',
+          email:     ev.payerEmail || '',
+          phone:     '',
+          address:   { line1:'', line2:'', city:'', zip:'', country:'US' },
+        },
+        product: { color: selectedColor||'Not selected', size: selectedSize||'Not selected' },
+      }),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    clientSecret = data.client_secret;
+
+    // Step 2: confirm with the Apple Pay payment method
+    const { paymentIntent, error: confirmError } = await stripe.confirmCardPayment(
+      clientSecret,
       { payment_method: ev.paymentMethod.id },
       { handleActions: false }
     );
-    if (error) { ev.complete('fail'); throw new Error(error.message); }
-    ev.complete('success');
-    if (paymentIntent.status === 'requires_action') {
-      await stripe.confirmCardPayment(pi.client_secret);
+
+    if (confirmError) {
+      ev.complete('fail');
+      throw new Error(confirmError.message);
     }
+
+    // Step 3: complete Apple Pay sheet
+    ev.complete('success');
+
+    // Step 4: handle any additional actions (3DS etc)
+    if (paymentIntent.status === 'requires_action') {
+      const { error: actionError } = await stripe.confirmCardPayment(clientSecret);
+      if (actionError) throw new Error(actionError.message);
+    }
+
     showSuccess();
   } catch (err) {
-    ev.complete('fail');
+    if (ev.complete) { try { ev.complete('fail'); } catch(e) {} }
     showError(err.message);
   }
 });
 
-// ── CARD ────────────────────────────────────────────────────
+// ── CARD ELEMENT ────────────────────────────────────────────
 const card = elements.create('card', {
   style: {
     base:    { fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:'14px', color:'#111', '::placeholder':{ color:'rgba(17,17,17,0.3)' } },
@@ -481,22 +509,6 @@ let selectedColor = '';
 let selectedSize  = '';
 
 // ── HELPERS ─────────────────────────────────────────────────
-async function createPaymentIntent(fn, ln, email, phone, line1, line2, city, zip, country) {
-  const r = await fetch('https://apstrap.vercel.app/api/checkout', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      amount: 799, currency: 'usd',
-      customer: { firstName:fn, lastName:ln, email:email, phone:phone,
-        address:{ line1:line1, line2:line2, city:city, zip:zip, country:country } },
-      product: { color: selectedColor||'Not selected', size: selectedSize||'Not selected' },
-    }),
-  });
-  const data = await r.json();
-  if (data.error) throw new Error(data.error);
-  return data;
-}
-
 function showSuccess() {
   document.getElementById('checkoutForm').style.display = 'none';
   document.getElementById('successScreen').classList.add('show');
@@ -562,7 +574,7 @@ function validate() {
   return ok;
 }
 
-// ── SUBMIT ──────────────────────────────────────────────────
+// ── CARD SUBMIT ─────────────────────────────────────────────
 document.getElementById('checkoutForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!validate()) return;
@@ -580,15 +592,28 @@ document.getElementById('checkoutForm').addEventListener('submit', async e => {
     const zip     = document.getElementById('zip').value.trim();
     const country = document.getElementById('country').value;
 
-    const pi = await createPaymentIntent(fn, ln, email, phone, line1, line2, city, zip, country);
+    // Create PaymentIntent on backend
+    const r = await fetch('https://apstrap.vercel.app/api/checkout', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 799, currency: 'usd',
+        customer: { firstName:fn, lastName:ln, email:email, phone:phone,
+          address:{ line1, line2, city, zip, country } },
+        product: { color:selectedColor||'Not selected', size:selectedSize||'Not selected' },
+      }),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
 
-    const { error, paymentIntent } = await stripe.confirmCardPayment(pi.client_secret, {
+    // Confirm with card element
+    const { error } = await stripe.confirmCardPayment(data.client_secret, {
       payment_method: {
         card,
         billing_details: {
-          name: fn + ' ' + ln,
+          name:    fn + ' ' + ln,
           email,
-          phone: phone || undefined,
+          phone:   phone || undefined,
           address: { line1, line2:line2||undefined, city, postal_code:zip, country },
         },
       },
@@ -606,6 +631,7 @@ function openModal()  { document.getElementById('termsModal').classList.add('ope
 function closeModal() { document.getElementById('termsModal').classList.remove('open'); document.body.style.overflow=''; }
 document.getElementById('termsModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 </script>
+
 
 </body>
 </html>
