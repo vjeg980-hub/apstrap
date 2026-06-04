@@ -64,9 +64,8 @@ module.exports = async (req, res) => {
 
   const { paymentMethodId, customer, consent } = body;
 
-  if (!paymentMethodId) return res.status(400).json({ error: 'Missing payment method' });
-  if (!customer?.email) return res.status(400).json({ error: 'Missing customer email' });
-  if (!consent?.authorizedVariableBilling) return res.status(400).json({ error: 'Billing authorization required' });
+  if (!paymentMethodId)    return res.status(400).json({ error: 'Missing payment method' });
+  if (!customer?.email)    return res.status(400).json({ error: 'Missing customer email' });
   if (!consent?.agreedToTerms) return res.status(400).json({ error: 'Terms agreement required' });
 
   try {
@@ -88,10 +87,9 @@ module.exports = async (req, res) => {
       'payment_method[gateway_account_id]': process.env.CHARGEBEE_GATEWAY_ID,
       'payment_method[tmp_token]':          paymentMethodId,
       'meta_data': JSON.stringify({
-        authorized_variable_billing: consent.authorizedVariableBilling,
-        agreed_to_terms:             consent.agreedToTerms,
-        authorized_at:               consent.authorizedAt,
-        marketing_opt_in:            consent.marketingOptIn || false,
+        agreed_to_terms:  consent.agreedToTerms,
+        authorized_at:    consent.authorizedAt,
+        marketing_opt_in: consent.marketingOptIn || false,
       }),
     });
 
