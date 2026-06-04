@@ -395,25 +395,37 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <script>
-const STRIPE_KEY = 'pk_live_51R4QM1F47kyO7cD9H8gK8tIQyMqlXK224HZO4hPipTWTdCKB5JAJ1iYhO5nz4Q3VDRPcakLhxUSqJLOvt38bhdgG00zaW0da1I';
-const stripe   = Stripe(STRIPE_KEY);
+const stripe = Stripe('pk_live_51R4QM1F47kyO7cD9H8gK8tIQyMqlXK224HZO4hPipTWTdCKB5JAJ1iYhO5nz4Q3VDRPcakLhxUSqJLOvt38bhdgG00zaW0da1I');
 const elements = stripe.elements();
 
 const card = elements.create('card', {
   style: {
-    base: { fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:'14px', color:'#111', '::placeholder':{color:'rgba(17,17,17,0.3)'} },
-    invalid: { color:'#C0392B' }
+    base: {
+      fontFamily: "'DM Sans', system-ui, sans-serif",
+      fontSize: '14px',
+      color: '#111',
+      '::placeholder': { color: 'rgba(17,17,17,0.3)' }
+    },
+    invalid: { color: '#C0392B' }
   },
   hidePostalCode: true
 });
+
 card.mount('#card-element');
+
 card.on('focus', () => document.getElementById('cardWrap').classList.add('focused'));
 card.on('blur',  () => document.getElementById('cardWrap').classList.remove('focused'));
 card.on('change', e => {
-  const err = document.getElementById('cardErr');
+  const err  = document.getElementById('cardErr');
   const wrap = document.getElementById('cardWrap');
-  if (e.error) { err.textContent = e.error.message; err.classList.add('show'); wrap.classList.add('err-state'); }
-  else { err.classList.remove('show'); wrap.classList.remove('err-state'); }
+  if (e.error) {
+    err.textContent = e.error.message;
+    err.classList.add('show');
+    wrap.classList.add('err-state');
+  } else {
+    err.classList.remove('show');
+    wrap.classList.remove('err-state');
+  }
 });
 
 let selectedColor = '';
@@ -426,8 +438,8 @@ function selectColor(el, color) {
   document.getElementById('colorNote').textContent = color;
   document.getElementById('colorSelectedLabel').textContent = '— ' + color;
   document.getElementById('colorErr').classList.remove('show');
-  const pinkColors = ['Hot Pink','Dusty Rose','Lavender'];
-  document.getElementById('previewImg').src = pinkColors.includes(color) ? IMG_PINK : IMG_BLACK;
+  const warm = ['Hot Pink','Dusty Rose','Lavender'];
+  document.getElementById('previewImg').src = warm.includes(color) ? IMG_PINK : IMG_BLACK;
 }
 
 function selectSize(el, size) {
@@ -438,59 +450,71 @@ function selectSize(el, size) {
 }
 
 function setErr(inputId, errId, show) {
-  const el = document.getElementById(inputId);
+  const el  = document.getElementById(inputId);
   const err = document.getElementById(errId);
   if (!el || !err) return;
-  show ? el.classList.add('err') : el.classList.remove('err');
-  show ? err.classList.add('show') : err.classList.remove('show');
+  el.classList.toggle('err', show);
+  err.classList.toggle('show', show);
 }
 
 function validate() {
   let ok = true;
   if (!selectedColor) { document.getElementById('colorErr').classList.add('show'); ok = false; }
-  if (!selectedSize)  { document.getElementById('sizeErr').classList.add('show'); ok = false; }
+  if (!selectedSize)  { document.getElementById('sizeErr').classList.add('show');  ok = false; }
   const fn = document.getElementById('firstName').value.trim();
   const ln = document.getElementById('lastName').value.trim();
   const em = document.getElementById('email').value.trim();
   const ad = document.getElementById('address').value.trim();
   const ci = document.getElementById('city').value.trim();
   const zp = document.getElementById('zip').value.trim();
-  setErr('firstName','firstNameErr',!fn); if(!fn) ok=false;
-  setErr('lastName','lastNameErr',!ln);   if(!ln) ok=false;
-  setErr('address','addressErr',!ad);     if(!ad) ok=false;
-  setErr('city','cityErr',!ci);           if(!ci) ok=false;
-  setErr('zip','zipErr',!zp);             if(!zp) ok=false;
+  setErr('firstName','firstNameErr', !fn); if (!fn) ok = false;
+  setErr('lastName', 'lastNameErr',  !ln); if (!ln) ok = false;
+  setErr('address',  'addressErr',   !ad); if (!ad) ok = false;
+  setErr('city',     'cityErr',      !ci); if (!ci) ok = false;
+  setErr('zip',      'zipErr',       !zp); if (!zp) ok = false;
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
-  setErr('email','emailErr',!emailOk); if(!emailOk) ok=false;
-  const cb2 = document.getElementById('authTerms').checked;
-  const cbErr = document.getElementById('checkboxErr');
-  if (!cb2) { cbErr.textContent='Please agree to the terms to continue.'; cbErr.classList.add('show'); ok=false; }
-  else { cbErr.classList.remove('show'); }
+  setErr('email', 'emailErr', !emailOk); if (!emailOk) ok = false;
+  const agreed = document.getElementById('authTerms').checked;
+  const cbErr  = document.getElementById('checkboxErr');
+  if (!agreed) {
+    cbErr.textContent = 'Please agree to the terms to continue.';
+    cbErr.classList.add('show');
+    ok = false;
+  } else {
+    cbErr.classList.remove('show');
+  }
   return ok;
 }
 
 document.getElementById('checkoutForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!validate()) return;
+
   const btn = document.getElementById('submitBtn');
   const msg = document.getElementById('formMsg');
-  btn.disabled = true; btn.classList.add('loading'); msg.className = 'msg';
+  btn.disabled = true;
+  btn.classList.add('loading');
+  msg.className = 'msg';
+
   try {
-    const { token, error: pmErr } = await stripe.createToken(card, {
-      name: `${document.getElementById('firstName').value.trim()} ${document.getElementById('lastName').value.trim()}`,
-      address_line1: document.getElementById('address').value.trim(),
-      address_line2: document.getElementById('address2').value.trim() || undefined,
-      address_city:  document.getElementById('city').value.trim(),
-      address_zip:   document.getElementById('zip').value.trim(),
+    const { token, error: tokenErr } = await stripe.createToken(card, {
+      name: document.getElementById('firstName').value.trim() + ' ' + document.getElementById('lastName').value.trim(),
+      address_line1:   document.getElementById('address').value.trim(),
+      address_line2:   document.getElementById('address2').value.trim() || undefined,
+      address_city:    document.getElementById('city').value.trim(),
+      address_zip:     document.getElementById('zip').value.trim(),
       address_country: document.getElementById('country').value,
     });
-    if (pmErr) throw new Error(pmErr.message);
-    if (!token) throw new Error('Could not create payment token. Please try again.');
+
+    if (tokenErr) throw new Error(tokenErr.message);
+    if (!token)   throw new Error('Could not create payment token. Please try again.');
+
     const res = await fetch('https://apstrap.vercel.app/api/checkout', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         paymentMethodId: token.id,
-        planId:   'FLOWRA-Dress-EUR',
+        planId:   'FLOWRA-Club-EUR-Monthly',
         chargeId: 'FLOWRA-Dress-EUR',
         customer: {
           firstName: document.getElementById('firstName').value.trim(),
@@ -506,28 +530,45 @@ document.getElementById('checkoutForm').addEventListener('submit', async e => {
           },
         },
         product: { color: selectedColor, size: selectedSize },
-        consent: { agreedToTerms: true, authorizedAt: new Date().toISOString(), marketingOptIn: document.getElementById('marketing').checked },
+        consent: {
+          agreedToTerms: true,
+          authorizedAt:  new Date().toISOString(),
+          marketingOptIn: document.getElementById('marketing').checked,
+        },
       }),
     });
+
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+
     if (data.requiresAction && data.clientSecret) {
       const { error: confirmErr } = await stripe.confirmCardPayment(data.clientSecret);
       if (confirmErr) throw new Error(confirmErr.message);
     }
+
     document.getElementById('checkoutForm').style.display = 'none';
     document.getElementById('successScreen').classList.add('show');
-    window.scrollTo({top:0,behavior:'smooth'});
-  } catch(err) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (err) {
     msg.textContent = err.message || 'Something went wrong. Please try again or contact support@flowra.com';
     msg.className = 'msg error';
-    btn.disabled = false; btn.classList.remove('loading');
+    btn.disabled = false;
+    btn.classList.remove('loading');
   }
 });
 
-function openModal()  { document.getElementById('termsModal').classList.add('open'); document.body.style.overflow='hidden'; }
-function closeModal() { document.getElementById('termsModal').classList.remove('open'); document.body.style.overflow=''; }
-document.getElementById('termsModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
+function openModal()  {
+  document.getElementById('termsModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('termsModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.getElementById('termsModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
 </script>
 
 </body>
