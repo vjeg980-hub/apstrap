@@ -96,18 +96,16 @@ module.exports = async (req, res) => {
     const customerId      = cbCustomer.customer.id;
     const paymentSourceId = cbCustomer.customer.primary_payment_source_id;
 
-    // ── STEP 2: Charge for dress — Catalog 1.0 one-time charge ──
+    // ── STEP 2: One-time charge for dress ─────────────────────
     const invoice = await chargebeeRequest('POST', '/invoices/charge', {
       'customer_id':       customerId,
       'payment_source_id': paymentSourceId,
       'currency_code':     'EUR',
       'amount':            799,
       'description':       'FLOWRA Plush Backless Active Dress',
-      'addon_id[0]':       'FLOWRA-Dress-EUR',
-      'addon_quantity[0]': 1,
     });
 
-    // ── STEP 3: Create FLOWRA Club subscription — Catalog 1.0 ──
+    // ── STEP 3: Create €0/mo club subscription ────────────────
     const subscription = await chargebeeRequest(
       'POST',
       `/customers/${customerId}/subscriptions`,
