@@ -64,8 +64,8 @@ module.exports = async (req, res) => {
 
   const { paymentMethodId, customer, consent } = body;
 
-  if (!paymentMethodId)    return res.status(400).json({ error: 'Missing payment method' });
-  if (!customer?.email)    return res.status(400).json({ error: 'Missing customer email' });
+  if (!paymentMethodId)        return res.status(400).json({ error: 'Missing payment method' });
+  if (!customer?.email)        return res.status(400).json({ error: 'Missing customer email' });
   if (!consent?.agreedToTerms) return res.status(400).json({ error: 'Terms agreement required' });
 
   try {
@@ -96,23 +96,25 @@ module.exports = async (req, res) => {
     const customerId      = cbCustomer.customer.id;
     const paymentSourceId = cbCustomer.customer.primary_payment_source_id;
 
-    // ── STEP 2: Charge for FLOWRA Dress — one-time invoice ────
-    const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
-      'customer_id':                   customerId,
-      'payment_source_id':             paymentSourceId,
-      'currency_code':                 'EUR',
-      'item_prices[item_price_id][0]': 'FLOWRA-Dress-EUR',
-      'item_prices[quantity][0]':      '1',
+    // ── STEP 2: Charge for dress — Catalog 1.0 one-time charge ──
+    const invoice = await chargebeeRequest('POST', '/invoices/charge', {
+      'customer_id':       customerId,
+      'payment_source_id': paymentSourceId,
+      'currency_code':     'EUR',
+      'amount':            799,
+      'description':       'FLOWRA Plush Backless Active Dress',
+      'addon_id[0]':       'FLOWRA-Dress-EUR',
+      'addon_quantity[0]': 1,
     });
 
-    // ── STEP 3: Create FLOWRA Club subscription ───────────────
+    // ── STEP 3: Create FLOWRA Club subscription — Catalog 1.0 ──
     const subscription = await chargebeeRequest(
       'POST',
-      `/customers/${customerId}/subscription_for_items`,
+      `/customers/${customerId}/subscriptions`,
       {
-        'payment_source_id':                    paymentSourceId,
-        'subscription_items[item_price_id][0]': 'FLOWRA-Club-EUR-Monthly',
-        'subscription_items[quantity][0]':      '1',
+        'payment_source_id': paymentSourceId,
+        'plan_id':           'FLOWRA-Club-EUR-Monthly',
+        'plan_quantity':     1,
       }
     );
 
