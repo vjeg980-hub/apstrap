@@ -422,6 +422,16 @@ const paymentRequest = stripe.paymentRequest({
   requestPayerEmail: true,
 });
 
+paymentRequest.canMakePayment().then(result => {
+  console.log('canMakePayment result:', result);
+  if (result) {
+    prButton.mount('#payment-request-button');
+    document.getElementById('expressPaySection').style.display = 'block';
+  } else {
+    console.log('Apple Pay not available - result was null');
+  }
+});
+
 const prButton = elements.create('paymentRequestButton', {
   paymentRequest,
   style: { paymentRequestButton: { type: 'buy', theme: 'dark', height: '48px' } }
