@@ -1,8 +1,6 @@
 // ============================================================
-// FLOWRA — Pure Stripe Backend
-// Creates customer + PaymentIntent with saved card
-// Cards saved via setup_future_usage — charge anytime from
-// Stripe dashboard or API using customer ID
+// FLOWRA — Pure Stripe Backend v2
+// Fixed for Apple Pay compatibility
 // ============================================================
 
 const Stripe = require('stripe');
@@ -28,30 +26,23 @@ module.exports = async (req, res) => {
   const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
   try {
-    // Find or create Stripe customer — so repeat buyers don't get duplicated
+    // Find or create Stripe customer
     const existing = await stripe.customers.list({ email: customer.email, limit: 1 });
     let stripeCustomer;
 
     if (existing.data.length > 0) {
       stripeCustomer = existing.data[0];
-      // Update metadata with latest order info
-      await stripe.customers.update(stripeCustomer.id, {
-        metadata: {
-          product_color: product?.color || '',
-          product_size:  product?.size  || '',
-        },
-      });
     } else {
       stripeCustomer = await stripe.customers.create({
         email: customer.email,
-        name:  `${customer.firstName} ${customer.lastName}`.trim(),
+        name:  `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
         phone: customer.phone || undefined,
         address: {
-          line1:       customer.address?.line1    || '',
-          line2:       customer.address?.line2    || undefined,
-          city:        customer.address?.city     || '',
-          postal_code: customer.address?.zip      || '',
-          country:     customer.address?.country  || 'US',
+          line1:       customer.address?.line1   || '',
+          line2:       customer.address?.line2   || undefined,
+          city:        customer.address?.city    || '',
+          postal_code: customer.address?.zip     || '',
+          country:     customer.address?.country || 'US',
         },
         metadata: {
           product_color: product?.color || '',
@@ -60,17 +51,16 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Create PaymentIntent
-    // setup_future_usage: 'off_session' saves the card to the customer
-    // so you can charge them again anytime from Stripe dashboard or API
+    // IMPORTANT: do NOT use automatic_payment_methods with Apple Pay
+    // Use payment_method_types: ['card'] so confirmCardPayment works
     const paymentIntent = await stripe.paymentIntents.create({
-      amount:   amount,
-      currency: currency || 'usd',
-      customer: stripeCustomer.id,
-      setup_future_usage: 'off_session',
-      automatic_payment_methods: { enabled: true },
+      amount:               amount,
+      currency:             currency || 'usd',
+      customer:             stripeCustomer.id,
+      payment_method_types: ['card'],
+      setup_future_usage:   'off_session',
       metadata: {
-        customer_name:  `${customer.firstName} ${customer.lastName}`.trim(),
+        customer_name:  `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
         customer_email: customer.email,
         product_color:  product?.color || '',
         product_size:   product?.size  || '',
