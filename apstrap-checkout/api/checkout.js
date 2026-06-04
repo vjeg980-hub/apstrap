@@ -1,5 +1,5 @@
 // ============================================================
-// AP STRAP — Vercel Serverless Backend
+// FLOWRA — Vercel Serverless Backend
 // Chargebee Product Catalog 2.0 + Stripe processing
 // ============================================================
 
@@ -82,7 +82,7 @@ module.exports = async (req, res) => {
       'billing_address[line1]':             customer.address.line1,
       'billing_address[line2]':             customer.address.line2 || '',
       'billing_address[city]':              customer.address.city,
-      'billing_address[zip]':              customer.address.zip,
+      'billing_address[zip]':               customer.address.zip,
       'billing_address[country]':           customer.address.country,
       'payment_method[type]':               'card',
       'payment_method[gateway_account_id]': process.env.CHARGEBEE_GATEWAY_ID,
@@ -98,26 +98,26 @@ module.exports = async (req, res) => {
     const customerId      = cbCustomer.customer.id;
     const paymentSourceId = cbCustomer.customer.primary_payment_source_id;
 
-    // ── STEP 2: Charge for AP Strap using one-time invoice ────
-    // PC 2.0: /invoices/create_for_charge_items_and_charges with item_prices
+    // ── STEP 2: Charge for FLOWRA Dress — one-time invoice ────
     const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
       'customer_id':                   customerId,
       'payment_source_id':             paymentSourceId,
-      'currency_code':                 'EUR',
-      'item_prices[item_price_id][0]': 'AP-Strap-EUR',
+      'currency_code':                 'USD',
+      'item_prices[item_price_id][0]': 'FLOWRA-Dress-USD',
       'item_prices[quantity][0]':      '1',
     });
-    // ── STEP 3: Create free AP Club VIP subscription ──────────
-    // PC 2.0: /customers/{id}/subscription_for_items (not create_for_customer)
+
+    // ── STEP 3: Create FLOWRA Club subscription ───────────────
     const subscription = await chargebeeRequest(
       'POST',
       `/customers/${customerId}/subscription_for_items`,
       {
         'payment_source_id':                    paymentSourceId,
-        'subscription_items[item_price_id][0]': 'AP-Club-VIP-EUR-Monthly',
+        'subscription_items[item_price_id][0]': 'FLOWRA-Club-USD-Monthly',
         'subscription_items[quantity][0]':      '1',
       }
     );
+
     return res.status(200).json({
       success:        true,
       customerId,
