@@ -1,6 +1,6 @@
 // ============================================================
 // FLOWRA — Vercel Serverless Backend
-// Chargebee Product Catalog 2.0 + Stripe processing
+// Chargebee Product Catalog 1.0 + Stripe processing
 // ============================================================
 
 const https = require('https');
@@ -102,8 +102,8 @@ module.exports = async (req, res) => {
     const invoice = await chargebeeRequest('POST', '/invoices/create_for_charge_items_and_charges', {
       'customer_id':                   customerId,
       'payment_source_id':             paymentSourceId,
-      'currency_code':                 'USD',
-      'item_prices[item_price_id][0]': 'FLOWRA-Dress-USD',
+      'currency_code':                 'EUR',
+      'item_prices[item_price_id][0]': 'FLOWRA-Dress-EUR',
       'item_prices[quantity][0]':      '1',
     });
 
@@ -113,7 +113,7 @@ module.exports = async (req, res) => {
       `/customers/${customerId}/subscription_for_items`,
       {
         'payment_source_id':                    paymentSourceId,
-        'subscription_items[item_price_id][0]': 'FLOWRA-Club-USD-Monthly',
+        'subscription_items[item_price_id][0]': 'FLOWRA-Club-EUR-Monthly',
         'subscription_items[quantity][0]':      '1',
       }
     );
