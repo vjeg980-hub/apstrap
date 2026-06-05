@@ -269,14 +269,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
       <p class="section-head">Colour</p>
       <div class="color-label">Select your colour <span id="colorSelectedLabel" style="font-weight:700;color:var(--ink);"></span></div>
       <div class="color-pills">
+        <div class="color-pill" onclick="selectColor(this,'Fuchsia Purple')">Fuchsia Purple</div>
         <div class="color-pill" onclick="selectColor(this,'Hot Pink')">Hot Pink</div>
-        <div class="color-pill" onclick="selectColor(this,'Black')">Black</div>
-        <div class="color-pill" onclick="selectColor(this,'White')">White</div>
-        <div class="color-pill" onclick="selectColor(this,'Navy Blue')">Navy Blue</div>
-        <div class="color-pill" onclick="selectColor(this,'Lavender')">Lavender</div>
-        <div class="color-pill" onclick="selectColor(this,'Sage Green')">Sage Green</div>
-        <div class="color-pill" onclick="selectColor(this,'Cream')">Cream</div>
         <div class="color-pill" onclick="selectColor(this,'Dusty Rose')">Dusty Rose</div>
+        <div class="color-pill" onclick="selectColor(this,'Lavender')">Lavender</div>
+        <div class="color-pill" onclick="selectColor(this,'Coral')">Coral</div>
+        <div class="color-pill" onclick="selectColor(this,'Sage Green')">Sage Green</div>
+        <div class="color-pill" onclick="selectColor(this,'Mint Green')">Mint Green</div>
+        <div class="color-pill" onclick="selectColor(this,'Olive Green')">Olive Green</div>
+        <div class="color-pill" onclick="selectColor(this,'Sky Blue')">Sky Blue</div>
+        <div class="color-pill" onclick="selectColor(this,'Navy Blue')">Navy Blue</div>
+        <div class="color-pill" onclick="selectColor(this,'Cream')">Cream</div>
+        <div class="color-pill" onclick="selectColor(this,'White')">White</div>
+        <div class="color-pill" onclick="selectColor(this,'Charcoal')">Charcoal</div>
+        <div class="color-pill" onclick="selectColor(this,'Black')">Black</div>
+        <div class="color-pill" onclick="selectColor(this,'Burgundy')">Burgundy</div>
+        <div class="color-pill" onclick="selectColor(this,'Caramel Brown')">Caramel Brown</div>
       </div>
       <div class="color-req" id="colorErr">Please select a colour</div>
     </div>
@@ -290,7 +298,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
         <div class="size-pill" onclick="selectSize(this,'M')">M</div>
         <div class="size-pill" onclick="selectSize(this,'L')">L</div>
         <div class="size-pill" onclick="selectSize(this,'XL')">XL</div>
-        <div class="size-pill" onclick="selectSize(this,'XXL')">XXL</div>
+        <div class="size-pill" onclick="selectSize(this,'1X')">1X</div>
+        <div class="size-pill" onclick="selectSize(this,'2X')">2X</div>
+        <div class="size-pill" onclick="selectSize(this,'3X')">3X</div>
       </div>
       <div class="size-req" id="sizeErr">Please select a size</div>
     </div>
