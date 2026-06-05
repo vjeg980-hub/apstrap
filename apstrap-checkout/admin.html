@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLOWRA — Admin</title>
+<style>
+  :root {
+    --ink: #111;
+    --ink-60: rgba(17,17,17,0.6);
+    --ink-30: rgba(17,17,17,0.3);
+    --ink-08: rgba(17,17,17,0.08);
+    --bg: #F8F8F6;
+    --white: #fff;
+    --rule: #E8E8E4;
+    --accent: #E8547A;
+    --green: #1A7F4B;
+    --green-bg: #EDFAF3;
+    --error: #C0392B;
+    --error-bg: #FEF2F2;
+    --sans: 'DM Sans', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--ink); min-height: 100vh; padding: 40px 20px; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  /* Login */
+  .login-card { background: var(--white); border-radius: 16px; padding: 48px; max-width: 400px; margin: 80px auto; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+  .login-card h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+  .login-card p { color: var(--ink-60); font-size: 14px; margin-bottom: 28px; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--ink-60); }
+  .field input { height: 44px; padding: 0 14px; border: 1.5px solid var(--rule); border-radius: 8px; font-family: var(--sans); font-size: 14px; outline: none; }
+  .field input:focus { border-color: var(--ink); }
+  .btn { height: 48px; padding: 0 24px; border: none; border-radius: 100px; font-family: var(--sans); font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: opacity .15s; }
+  .btn:hover { opacity: .85; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-dark { background: var(--ink); color: #fff; width: 100%; }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-outline { background: transparent; border: 1.5px solid var(--rule); color: var(--ink); }
+  .err { color: var(--error); font-size: 13px; margin-top: 8px; display: none; }
+  .err.show { display: block; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+  .header h1 { font-size: 28px; font-weight: 700; }
+  .header p { font-size: 14px; color: var(--ink-60); margin-top: 4px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat { background: var(--white); border-radius: 12px; padding: 20px 24px; }
+  .stat-label { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-30); margin-bottom: 8px; }
+  .stat-value { font-size: 32px; font-weight: 700; }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--error); }
+
+  /* Charge bar */
+  .charge-bar { background: var(--white); border-radius: 12px; padding: 24px; margin-bottom: 24px; display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .charge-bar .field { margin-bottom: 0; flex: 1; min-width: 160px; }
+  .charge-bar .field input { width: 100%; }
+  .charge-actions { display: flex; gap: 10px; align-items: flex-end; }
+
+  /* Table */
+  .table-wrap { background: var(--white); border-radius: 12px; overflow: hidden; }
+  .table-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid var(--rule); }
+  .table-header h2 { font-size: 16px; font-weight: 700; }
+  .table-search { height: 36px; padding: 0 12px; border: 1.5px solid var(--rule); border-radius: 8px; font-family: var(--sans); font-size: 13px; outline: none; width: 220px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-30); padding: 12px 24px; border-bottom: 1px solid var(--rule); }
+  td { padding: 14px 24px; font-size: 13px; border-bottom: 1px solid var(--ink-08); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg); }
+  .cb { width: 16px; height: 16px; accent-color: var(--ink); cursor: pointer; }
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 700; }
+  .badge-success { background: var(--green-bg); color: var(--green); }
+  .badge-fail { background: var(--error-bg); color: var(--error); }
+  .badge-pending { background: var(--ink-08); color: var(--ink-60); }
+
+  /* Results */
+  .results-wrap { margin-top: 24px; background: var(--white); border-radius: 12px; overflow: hidden; display: none; }
+  .results-wrap.show { display: block; }
+  .results-header { padding: 20px 24px; border-bottom: 1px solid var(--rule); display: flex; align-items: center; gap: 16px; }
+  .results-header h2 { font-size: 16px; font-weight: 700; }
+
+  /* Loading */
+  .spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: none; }
+  .loading .spin { display: inline-block; }
+  .loading .btn-label { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Msg */
+  .msg { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .msg.error { background: var(--error-bg); color: var(--error); display: block; }
+  .msg.success { background: var(--green-bg); color: var(--green); display: block; }
+
+  .select-all-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-60); padding: 10px 24px; border-bottom: 1px solid var(--rule); background: var(--bg); }
+
+  @media(max-width:600px) {
+    .stats { grid-template-columns: 1fr; }
+    .charge-bar { flex-direction: column; }
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>FLOWRA Admin</h1>
+    <p>Enter your admin password to continue.</p>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="passwordInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+    </div>
+    <div class="err" id="loginErr">Incorrect password.</div>
+    <button class="btn btn-dark" onclick="login()" id="loginBtn">
+      <div class="spin"></div>
+      <span class="btn-label">Sign in</span>
+    </button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none;">
+  <div class="wrap">
+
+    <div class="header">
+      <div>
+        <h1>FLOWRA Admin</h1>
+        <p id="lastUpdated">Loading customers...</p>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-outline" onclick="loadCustomers()">↻ Refresh</button>
+        <button class="btn btn-outline" onclick="logout()">Sign out</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Total Customers</div>
+        <div class="stat-value" id="statTotal">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Last Charge — Succeeded</div>
+        <div class="stat-value green" id="statSucceeded">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Last Charge — Failed</div>
+        <div class="stat-value red" id="statFailed">—</div>
+      </div>
+    </div>
+
+    <!-- Charge bar -->
+    <div class="charge-bar">
+      <div class="field">
+        <label>Amount (USD)</label>
+        <input type="number" id="chargeAmount" placeholder="e.g. 29.99" min="0.50" step="0.01">
+      </div>
+      <div class="field">
+        <label>Description (optional)</label>
+        <input type="text" id="chargeDesc" placeholder="e.g. FLOWRA Monthly — June">
+      </div>
+      <div class="charge-actions">
+        <button class="btn btn-accent" onclick="chargeSelected()" id="chargeSelectedBtn">
+          <div class="spin"></div>
+          <span class="btn-label">Charge Selected</span>
+        </button>
+        <button class="btn btn-dark" onclick="chargeAll()" id="chargeAllBtn">
+          <div class="spin"></div>
+          <span class="btn-label">Charge All</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="msg" id="chargeMsg"></div>
+
+    <!-- Customer table -->
+    <div class="table-wrap">
+      <div class="table-header">
+        <h2>Customers with Saved Cards</h2>
+        <input type="text" class="table-search" id="searchInput" placeholder="Search name or email..." oninput="filterTable()">
+      </div>
+      <div class="select-all-row">
+        <input type="checkbox" class="cb" id="selectAll" onchange="toggleSelectAll()">
+        <span>Select all</span>
+        <span id="selectedCount" style="margin-left:auto;font-weight:600;color:var(--ink);">0 selected</span>
+      </div>
+      <table id="customerTable">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Card</th>
+            <th>Expires</th>
+            <th>Color</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody id="customerBody">
+          <tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-30);">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap" id="resultsWrap">
+      <div class="results-header">
+        <h2>Charge Results</h2>
+        <span id="resultsummary" style="font-size:13px;color:var(--ink-60);"></span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'https://apstrap.vercel.app/api/admin';
+let password = '';
+let customers = [];
+let filtered  = [];
+
+// ── AUTH ─────────────────────────────────────────────────────
+async function login() {
+  const pw  = document.getElementById('passwordInput').value;
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  if (!pw) return;
+  btn.classList.add('loading'); btn.disabled = true; err.style.display = 'none';
+  try {
+    const r = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw, action: 'list' }),
+    });
+    const data = await r.json();
+    if (r.status === 401) { err.style.display = 'block'; btn.classList.remove('loading'); btn.disabled = false; return; }
+    password = pw;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    renderCustomers(data.customers);
+  } catch(e) {
+    err.textContent = 'Connection error. Try again.'; err.style.display = 'block';
+  }
+  btn.classList.remove('loading'); btn.disabled = false;
+}
+
+function logout() {
+  password = '';
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('passwordInput').value = '';
+}
+
+// ── LOAD ─────────────────────────────────────────────────────
+async function loadCustomers() {
+  document.getElementById('lastUpdated').textContent = 'Loading...';
+  try {
+    const r = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, action: 'list' }),
+    });
+    const data = await r.json();
+    renderCustomers(data.customers);
+  } catch(e) {
+    document.getElementById('lastUpdated').textContent = 'Error loading customers';
+  }
+}
+
+function renderCustomers(data) {
+  customers = data || [];
+  filtered  = [...customers];
+  document.getElementById('statTotal').textContent = customers.length;
+  document.getElementById('lastUpdated').textContent = `${customers.length} customers · Updated ${new Date().toLocaleTimeString()}`;
+  buildTable(filtered);
+}
+
+function buildTable(data) {
+  const body = document.getElementById('customerBody');
+  if (!data.length) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-30);">No customers found</td></tr>';
+    return;
+  }
+  body.innerHTML = data.map(c => `
+    <tr>
+      <td><input type="checkbox" class="cb customer-cb" value="${c.id}" onchange="updateSelectedCount()"></td>
+      <td style="font-weight:600;">${c.name}</td>
+      <td style="color:var(--ink-60);">${c.email}</td>
+      <td>${c.card}</td>
+      <td style="color:var(--ink-60);">${c.expires}</td>
+      <td style="color:var(--ink-60);">${c.color}</td>
+      <td style="color:var(--ink-60);">${c.size}</td>
+    </tr>
+  `).join('');
+  updateSelectedCount();
+}
+
+function filterTable() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  filtered = customers.filter(c =>
+    c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+  );
+  buildTable(filtered);
+}
+
+function toggleSelectAll() {
+  const checked = document.getElementById('selectAll').checked;
+  document.querySelectorAll('.customer-cb').forEach(cb => cb.checked = checked);
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const count = document.querySelectorAll('.customer-cb:checked').length;
+  document.getElementById('selectedCount').textContent = `${count} selected`;
+}
+
+function getSelectedIds() {
+  return [...document.querySelectorAll('.customer-cb:checked')].map(cb => cb.value);
+}
+
+// ── CHARGE ───────────────────────────────────────────────────
+async function chargeSelected() {
+  const ids = getSelectedIds();
+  if (!ids.length) { showChargeMsg('Please select at least one customer.', 'error'); return; }
+  await runCharge(ids);
+}
+
+async function chargeAll() {
+  if (!confirm(`Charge ALL ${customers.length} customers? This cannot be undone.`)) return;
+  await runCharge(null);
+}
+
+async function runCharge(ids) {
+  const amountInput = document.getElementById('chargeAmount').value;
+  const desc        = document.getElementById('chargeDesc').value.trim();
+  if (!amountInput || parseFloat(amountInput) < 0.50) {
+    showChargeMsg('Please enter a valid amount (minimum $0.50).', 'error');
+    return;
+  }
+  const amount = Math.round(parseFloat(amountInput) * 100); // convert to cents
+
+  const allBtn = document.getElementById('chargeAllBtn');
+  const selBtn = document.getElementById('chargeSelectedBtn');
+  allBtn.classList.add('loading'); allBtn.disabled = true;
+  selBtn.classList.add('loading'); selBtn.disabled = true;
+
+  try {
+    const r = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password, action: 'charge', amount, currency: 'usd',
+        description: desc || 'FLOWRA Variable Billing',
+        ...(ids && { customerIds: ids }),
+      }),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('statSucceeded').textContent = data.succeeded;
+    document.getElementById('statFailed').textContent    = data.failed;
+    showChargeMsg(`Done — ${data.succeeded} succeeded, ${data.failed} failed out of ${data.total} customers.`, data.failed > 0 ? 'error' : 'success');
+    renderResults(data.results, amount);
+  } catch(e) {
+    showChargeMsg(e.message, 'error');
+  }
+
+  allBtn.classList.remove('loading'); allBtn.disabled = false;
+  selBtn.classList.remove('loading'); selBtn.disabled = false;
+}
+
+function renderResults(results, amount) {
+  const wrap = document.getElementById('resultsWrap');
+  const body = document.getElementById('resultsBody');
+  const summary = document.getElementById('resultsummary');
+  const succeeded = results.filter(r => r.status === 'success').length;
+  const failed    = results.filter(r => r.status === 'failed').length;
+  summary.textContent = `${succeeded} succeeded · ${failed} failed`;
+  body.innerHTML = results.map(r => `
+    <tr>
+      <td style="font-weight:600;">${r.name}</td>
+      <td style="color:var(--ink-60);">${r.email}</td>
+      <td>$${(amount/100).toFixed(2)}</td>
+      <td><span class="badge badge-${r.status === 'success' ? 'success' : 'fail'}">${r.status === 'success' ? '✓ Charged' : '✗ Failed'}</span></td>
+      <td style="color:var(--ink-60);font-size:12px;">${r.piId || r.reason || '—'}</td>
+    </tr>
+  `).join('');
+  wrap.classList.add('show');
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function showChargeMsg(msg, type) {
+  const el = document.getElementById('chargeMsg');
+  el.textContent = msg;
+  el.className = `msg ${type}`;
+}
+</script>
+</body>
+</html>
