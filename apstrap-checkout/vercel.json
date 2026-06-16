@@ -18,6 +18,11 @@
       "dest": "/admin.html"
     },
     {
+      "src": "/.well-known/apple-developer-merchantid-domain-association",
+      "dest": "/.well-known/apple-developer-merchantid-domain-association",
+      "headers": { "Content-Type": "application/json" }
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
