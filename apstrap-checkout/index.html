@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FLOWRA — Checkout</title>
-<script src="https://js.stripe.com/v3/"></script>
+<script src="https://js.whop.com/static/checkout/loader.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -227,7 +227,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
   <div class="trust-stack">
     <div class="trust-row">
       <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-      256-bit SSL · Secured by Stripe
+      256-bit SSL · Secured by Whop
     </div>
     <div class="trust-row">
       <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -384,7 +384,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
       <p class="section-head">Payment</p>
       <div class="field">
         <label>Card details</label>
-        <div class="stripe-wrap" id="cardWrap"><div id="card-element"></div></div>
+        <div class="stripe-wrap" id="cardWrap"><div id="whop-checkout-embed"></div></div>
         <span class="ferr" id="cardErr"></span>
       </div>
     </div>
@@ -409,7 +409,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
       <span class="btn-label">🔒 &nbsp;Pay $7.99 — Complete Order</span>
     </button>
 
-    <div class="secure-line">🔒 Secured by Stripe · 256-bit SSL</div>
+    <div class="secure-line">🔒 Secured by Whop · 256-bit SSL</div>
     <div class="pay-icons">
       <span class="pay-icon">VISA</span>
       <span class="pay-icon">MC</span>
@@ -442,110 +442,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 </div>
 
 <script>
-const stripe   = Stripe('pk_live_51R4QM1F47kyO7cD9H8gK8tIQyMqlXK224HZO4hPipTWTdCKB5JAJ1iYhO5nz4Q3VDRPcakLhxUSqJLOvt38bhdgG00zaW0da1I');
-const elements = stripe.elements();
+// ── STATE ───────────────────────────────────────────────────
+let selectedColor = '';
+let selectedSize  = '';
 
-// ── APPLE PAY / GOOGLE PAY ──────────────────────────────────
-// Create the PaymentRequest upfront so Apple Pay can show
-const paymentRequest = stripe.paymentRequest({
-  country:           'US',
-  currency:          'usd',
-  total:             { label: 'FLOWRA Dress', amount: 799 },
-  requestPayerName:  true,
-  requestPayerEmail: true,
-});
-
-const prButton = elements.create('paymentRequestButton', {
-  paymentRequest,
-  style: { paymentRequestButton: { type: 'buy', theme: 'dark', height: '48px' } },
-});
-
-paymentRequest.canMakePayment().then(result => {
-  if (result) {
-    prButton.mount('#payment-request-button');
-    document.getElementById('expressSection').style.display = 'block';
-  }
-});
-
-// When Apple Pay fires — create PI on backend THEN confirm
-paymentRequest.on('paymentmethod', async (ev) => {
-  let clientSecret;
-  try {
-    // Step 1: create PaymentIntent on backend
-    const r = await fetch('https://apstrap.vercel.app/api/checkout', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: 799, currency: 'usd',
-        customer: {
-          firstName: ev.payerName ? ev.payerName.split(' ')[0] : '',
-          lastName:  ev.payerName ? ev.payerName.split(' ').slice(1).join(' ') : '',
-          email:     ev.payerEmail || '',
-          phone:     '',
-          address:   { line1:'', line2:'', city:'', zip:'', country:'US' },
-        },
-        product: { color: selectedColor||'Not selected', size: selectedSize||'Not selected' },
-      }),
-    });
-    const data = await r.json();
-    if (data.error) throw new Error(data.error);
-    clientSecret = data.client_secret;
-
-    // Step 2: confirm with the Apple Pay payment method
-    const { paymentIntent, error: confirmError } = await stripe.confirmCardPayment(
-      clientSecret,
-      { payment_method: ev.paymentMethod.id },
-      { handleActions: false }
-    );
-
-    if (confirmError) {
-      ev.complete('fail');
-      throw new Error(confirmError.message);
-    }
-
-    // Step 3: complete Apple Pay sheet
-    ev.complete('success');
-
-    // Step 4: handle any additional actions (3DS etc)
-    if (paymentIntent.status === 'requires_action') {
-      const { error: actionError } = await stripe.confirmCardPayment(clientSecret);
-      if (actionError) throw new Error(actionError.message);
-    }
-
-    showSuccess();
-  } catch (err) {
-    if (ev.complete) { try { ev.complete('fail'); } catch(e) {} }
-    showError(err.message);
-  }
-});
-
-// ── CARD ELEMENT ────────────────────────────────────────────
-const card = elements.create('card', {
-  style: {
-    base:    { fontFamily:"'DM Sans',system-ui,sans-serif", fontSize:'14px', color:'#111', '::placeholder':{ color:'rgba(17,17,17,0.3)' } },
-    invalid: { color:'#C0392B' },
-  },
-  hidePostalCode: true,
-});
-card.mount('#card-element');
-card.on('focus', () => {
-  document.getElementById('cardWrap').classList.add('focused');
+// Fire AddPaymentInfo pixel once the payment section is reached
+document.getElementById('whop-checkout-embed').addEventListener('focusin', () => {
   if (!window._pixelAddPaymentFired) {
     window._pixelAddPaymentFired = true;
     fbq('track', 'AddPaymentInfo', { value: 7.99, currency: 'USD' });
   }
-});
-card.on('blur',   () => document.getElementById('cardWrap').classList.remove('focused'));
-card.on('change', e => {
-  const err  = document.getElementById('cardErr');
-  const wrap = document.getElementById('cardWrap');
-  if (e.error) { err.textContent = e.error.message; err.classList.add('show'); wrap.classList.add('err-state'); }
-  else          { err.classList.remove('show'); wrap.classList.remove('err-state'); }
-});
+}, { once: true });
 
-// ── STATE ───────────────────────────────────────────────────
-let selectedColor = '';
-let selectedSize  = '';
 
 // ── HELPERS ─────────────────────────────────────────────────
 function showSuccess() {
@@ -620,13 +528,55 @@ function validate() {
   return ok;
 }
 
-// ── CARD SUBMIT ─────────────────────────────────────────────
+// ── WHOP CHECKOUT EMBED ─────────────────────────────────────
+// Whop's embed uses a data-attribute driven iframe (loader.js scans
+// the page for elements with these attributes and mounts an iframe).
+// Whop is PCI-compliant and does not allow raw card field access like
+// Stripe Elements did, so card capture happens inside Whop's iframe.
+// Flow: collect contact/address info -> create a checkout session on
+// our backend -> set data attributes -> loader mounts the embed ->
+// onComplete (postMessage) -> show success. The webhook
+// (api/whop-webhook.js) captures the payment_method_id server-side
+// for future rebills.
+
+let whopEmbedMounted = false;
+
+function mountWhopEmbed(sessionId) {
+  const container = document.getElementById('whop-checkout-embed');
+  container.innerHTML = '';
+  container.setAttribute('data-whop-checkout-session-id', sessionId);
+  container.setAttribute('data-whop-checkout-return-url', window.location.href);
+
+  // Re-run the loader's scan for embed targets
+  if (window.WhopCheckout && typeof window.WhopCheckout.mount === 'function') {
+    window.WhopCheckout.mount(container);
+  } else if (window.WhopEmbed && typeof window.WhopEmbed.scan === 'function') {
+    window.WhopEmbed.scan();
+  }
+
+  whopEmbedMounted = true;
+}
+
+// Listen for completion message from the Whop checkout iframe
+window.addEventListener('message', (event) => {
+  if (!event.origin.includes('whop.com')) return;
+  const data = event.data || {};
+  if (data.type === 'whop-checkout-complete' || data.type === 'checkout_complete') {
+    showSuccess();
+  }
+  if (data.type === 'whop-checkout-error' || data.type === 'checkout_error') {
+    showError(data.message || 'Payment failed. Please try again.');
+  }
+});
+
+// ── CONTINUE TO PAYMENT ─────────────────────────────────────
 document.getElementById('checkoutForm').addEventListener('submit', async e => {
   e.preventDefault();
   if (!validate()) return;
   const btn = document.getElementById('submitBtn');
   const msg = document.getElementById('formMsg');
   btn.disabled = true; btn.classList.add('loading'); msg.className = 'msg';
+
   try {
     const fn      = document.getElementById('firstName').value.trim();
     const ln      = document.getElementById('lastName').value.trim();
@@ -638,36 +588,29 @@ document.getElementById('checkoutForm').addEventListener('submit', async e => {
     const zip     = document.getElementById('zip').value.trim();
     const country = document.getElementById('country').value;
 
-    // Create PaymentIntent on backend
-    const r = await fetch('https://apstrap.vercel.app/api/checkout', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: 799, currency: 'usd',
-        customer: { firstName:fn, lastName:ln, email:email, phone:phone,
-          address:{ line1, line2, city, zip, country } },
-        product: { color:selectedColor||'Not selected', size:selectedSize||'Not selected' },
-      }),
-    });
-    const data = await r.json();
-    if (data.error) throw new Error(data.error);
+    if (!whopEmbedMounted) {
+      // Step 1: create a Whop checkout session on our backend
+      const r = await fetch('https://apstrap.vercel.app/api/checkout', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer: { firstName:fn, lastName:ln, email:email, phone:phone,
+            address:{ line1, line2, city, zip, country } },
+          product: { color:selectedColor||'Not selected', size:selectedSize||'Not selected' },
+        }),
+      });
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
 
-    // Confirm with card element
-    const { error } = await stripe.confirmCardPayment(data.client_secret, {
-      payment_method: {
-        card,
-        billing_details: {
-          name:    fn + ' ' + ln,
-          email,
-          phone:   phone || undefined,
-          address: { line1, line2:line2||undefined, city, postal_code:zip, country },
-        },
-      },
-      setup_future_usage: 'off_session',
-    });
+      // Step 2: mount Whop's embedded checkout for card entry + charge
+      mountWhopEmbed(data.session_id);
 
-    if (error) throw new Error(error.message);
-    showSuccess();
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.querySelector('.btn-label').textContent = '🔒  Enter card details above to complete';
+      return;
+    }
+    // If embed is already mounted, the embed's own iframe handles submission.
   } catch (err) {
     showError(err.message);
   }
