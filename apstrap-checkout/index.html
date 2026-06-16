@@ -379,44 +379,30 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
       </div>
     </div>
 
-    <!-- PAYMENT -->
+    <!-- PAYMENT — Whop Embedded Checkout -->
     <div class="section">
       <p class="section-head">Payment</p>
-      <div class="field">
-        <label>Card details</label>
-        <div class="stripe-wrap" id="cardWrap"><div id="whop-checkout-embed"></div></div>
-        <span class="ferr" id="cardErr"></span>
-      </div>
+      <div
+        id="whop-checkout-embed"
+        data-whop-checkout-plan-id="plan_6qFLQHVgliG6F"
+        data-whop-checkout-return-url="https://apstrap.vercel.app/"
+        data-whop-checkout-theme="light"
+        data-whop-checkout-skip-redirect="true"
+        data-whop-checkout-setup-future-usage="true"
+        data-whop-checkout-on-complete="onWhopComplete"
+        style="min-height:400px;width:100%;"
+      ></div>
     </div>
 
-    <!-- CHECKBOXES -->
     <div class="cbs">
       <div class="cb-row">
         <input type="checkbox" id="authTerms">
         <label for="authTerms">I agree to the <a href="#" onclick="openModal();return false;">Terms &amp; Conditions</a></label>
       </div>
-      <div class="cb-row">
-        <input type="checkbox" id="marketing">
-        <label for="marketing">Send me FLOWRA updates and exclusive offers (optional)</label>
-      </div>
     </div>
     <div class="cb-err" id="checkboxErr"></div>
-
     <div class="msg" id="formMsg"></div>
 
-    <button type="submit" class="submit-btn" id="submitBtn">
-      <div class="spin"></div>
-      <span class="btn-label">🔒 &nbsp;Pay $7.99 — Complete Order</span>
-    </button>
-
-    <div class="secure-line">🔒 Secured by Whop · 256-bit SSL</div>
-    <div class="pay-icons">
-      <span class="pay-icon">VISA</span>
-      <span class="pay-icon">MC</span>
-      <span class="pay-icon">AMEX</span>
-      <span class="pay-icon">Apple Pay</span>
-      <span class="pay-icon">Google Pay</span>
-    </div>
   </form>
 </div>
 
@@ -446,38 +432,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 let selectedColor = '';
 let selectedSize  = '';
 
-// Fire AddPaymentInfo pixel once the payment section is reached
-document.getElementById('whop-checkout-embed').addEventListener('focusin', () => {
-  if (!window._pixelAddPaymentFired) {
-    window._pixelAddPaymentFired = true;
-    fbq('track', 'AddPaymentInfo', { value: 7.99, currency: 'USD' });
-  }
-}, { once: true });
-
-
-// ── HELPERS ─────────────────────────────────────────────────
-function showSuccess() {
-  // Fire Meta Pixel Purchase event
+// ── WHOP COMPLETION CALLBACK ────────────────────────────────
+// Called by Whop embed via data-whop-checkout-on-complete attribute
+function onWhopComplete(planId, receiptId) {
   fbq('track', 'Purchase', {
-    value: 7.99,
+    value: 5.98,
     currency: 'USD',
     content_name: 'FLOWRA Plush Backless Active Dress',
     content_type: 'product'
   });
   document.getElementById('checkoutForm').style.display = 'none';
   document.getElementById('successScreen').classList.add('show');
-  window.scrollTo({ top:0, behavior:'smooth' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function showError(msg) {
-  const el  = document.getElementById('formMsg');
-  el.textContent = msg || 'Something went wrong. Please try again.';
-  el.className = 'msg error';
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = false;
-  btn.classList.remove('loading');
-}
-
+// ── HELPERS ─────────────────────────────────────────────────
 function selectColor(el, color) {
   document.querySelectorAll('.color-pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
@@ -495,126 +464,6 @@ function selectSize(el, size) {
   selectedSize = size;
   document.getElementById('sizeErr').classList.remove('show');
 }
-
-function setErr(inputId, errId, show) {
-  const el  = document.getElementById(inputId);
-  const err = document.getElementById(errId);
-  if (!el || !err) return;
-  el.classList.toggle('err', show);
-  err.classList.toggle('show', show);
-}
-
-function validate() {
-  let ok = true;
-  if (!selectedColor) { document.getElementById('colorErr').classList.add('show'); ok = false; }
-  if (!selectedSize)  { document.getElementById('sizeErr').classList.add('show');  ok = false; }
-  const fn = document.getElementById('firstName').value.trim();
-  const ln = document.getElementById('lastName').value.trim();
-  const em = document.getElementById('email').value.trim();
-  const ad = document.getElementById('address').value.trim();
-  const ci = document.getElementById('city').value.trim();
-  const zp = document.getElementById('zip').value.trim();
-  setErr('firstName','firstNameErr',!fn); if(!fn) ok=false;
-  setErr('lastName', 'lastNameErr', !ln); if(!ln) ok=false;
-  setErr('address',  'addressErr',  !ad); if(!ad) ok=false;
-  setErr('city',     'cityErr',     !ci); if(!ci) ok=false;
-  setErr('zip',      'zipErr',      !zp); if(!zp) ok=false;
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em);
-  setErr('email','emailErr',!emailOk); if(!emailOk) ok=false;
-  const agreed = document.getElementById('authTerms').checked;
-  const cbErr  = document.getElementById('checkboxErr');
-  if (!agreed) { cbErr.textContent='Please agree to the terms to continue.'; cbErr.classList.add('show'); ok=false; }
-  else           cbErr.classList.remove('show');
-  return ok;
-}
-
-// ── WHOP CHECKOUT EMBED ─────────────────────────────────────
-// Whop's embed uses a data-attribute driven iframe (loader.js scans
-// the page for elements with these attributes and mounts an iframe).
-// Whop is PCI-compliant and does not allow raw card field access like
-// Stripe Elements did, so card capture happens inside Whop's iframe.
-// Flow: collect contact/address info -> create a checkout session on
-// our backend -> set data attributes -> loader mounts the embed ->
-// onComplete (postMessage) -> show success. The webhook
-// (api/whop-webhook.js) captures the payment_method_id server-side
-// for future rebills.
-
-let whopEmbedMounted = false;
-
-function mountWhopEmbed(sessionId) {
-  const container = document.getElementById('whop-checkout-embed');
-  container.innerHTML = '';
-  container.setAttribute('data-whop-checkout-session-id', sessionId);
-  container.setAttribute('data-whop-checkout-return-url', window.location.href);
-
-  // Re-run the loader's scan for embed targets
-  if (window.WhopCheckout && typeof window.WhopCheckout.mount === 'function') {
-    window.WhopCheckout.mount(container);
-  } else if (window.WhopEmbed && typeof window.WhopEmbed.scan === 'function') {
-    window.WhopEmbed.scan();
-  }
-
-  whopEmbedMounted = true;
-}
-
-// Listen for completion message from the Whop checkout iframe
-window.addEventListener('message', (event) => {
-  if (!event.origin.includes('whop.com')) return;
-  const data = event.data || {};
-  if (data.type === 'whop-checkout-complete' || data.type === 'checkout_complete') {
-    showSuccess();
-  }
-  if (data.type === 'whop-checkout-error' || data.type === 'checkout_error') {
-    showError(data.message || 'Payment failed. Please try again.');
-  }
-});
-
-// ── CONTINUE TO PAYMENT ─────────────────────────────────────
-document.getElementById('checkoutForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  if (!validate()) return;
-  const btn = document.getElementById('submitBtn');
-  const msg = document.getElementById('formMsg');
-  btn.disabled = true; btn.classList.add('loading'); msg.className = 'msg';
-
-  try {
-    const fn      = document.getElementById('firstName').value.trim();
-    const ln      = document.getElementById('lastName').value.trim();
-    const email   = document.getElementById('email').value.trim();
-    const phone   = document.getElementById('phone').value.trim();
-    const line1   = document.getElementById('address').value.trim();
-    const line2   = document.getElementById('address2').value.trim();
-    const city    = document.getElementById('city').value.trim();
-    const zip     = document.getElementById('zip').value.trim();
-    const country = document.getElementById('country').value;
-
-    if (!whopEmbedMounted) {
-      // Step 1: create a Whop checkout session on our backend
-      const r = await fetch('https://apstrap.vercel.app/api/checkout', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer: { firstName:fn, lastName:ln, email:email, phone:phone,
-            address:{ line1, line2, city, zip, country } },
-          product: { color:selectedColor||'Not selected', size:selectedSize||'Not selected' },
-        }),
-      });
-      const data = await r.json();
-      if (data.error) throw new Error(data.error);
-
-      // Step 2: mount Whop's embedded checkout for card entry + charge
-      mountWhopEmbed(data.session_id);
-
-      btn.disabled = false;
-      btn.classList.remove('loading');
-      btn.querySelector('.btn-label').textContent = '🔒  Enter card details above to complete';
-      return;
-    }
-    // If embed is already mounted, the embed's own iframe handles submission.
-  } catch (err) {
-    showError(err.message);
-  }
-});
 
 function openModal()  { document.getElementById('termsModal').classList.add('open'); document.body.style.overflow='hidden'; }
 function closeModal() { document.getElementById('termsModal').classList.remove('open'); document.body.style.overflow=''; }
