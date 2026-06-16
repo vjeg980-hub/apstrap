@@ -1,9 +1,7 @@
 // ============================================================
-// FLOWRA — Pure Stripe Backend v2
-// Fixed for Apple Pay compatibility
+// FLOWRA — Whop Checkout Backend
+// Creates a Whop checkout session (charges + saves card for rebills)
 // ============================================================
-
-const Stripe = require('stripe');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,61 +17,56 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Invalid request body' });
   }
 
-  const { amount, currency, customer, product } = body;
-  if (!amount)          return res.status(400).json({ error: 'Missing amount' });
+  const { customer, product } = body;
   if (!customer?.email) return res.status(400).json({ error: 'Missing customer email' });
 
-  const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+  const WHOP_API_KEY = process.env.WHOP_API_KEY;
+  const WHOP_PLAN_ID = process.env.WHOP_PLAN_ID; // plan_XXXXXXXX for the $7.99 product
+  const RETURN_URL   = process.env.RETURN_URL || 'https://flowra.vercel.app/checkout/complete';
+
+  if (!WHOP_API_KEY || !WHOP_PLAN_ID) {
+    return res.status(500).json({ error: 'Server misconfigured: missing Whop env vars' });
+  }
 
   try {
-    // Find or create Stripe customer
-    const existing = await stripe.customers.list({ email: customer.email, limit: 1 });
-    let stripeCustomer;
-
-    if (existing.data.length > 0) {
-      stripeCustomer = existing.data[0];
-    } else {
-      stripeCustomer = await stripe.customers.create({
-        email: customer.email,
-        name:  `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
-        phone: customer.phone || undefined,
-        address: {
-          line1:       customer.address?.line1   || '',
-          line2:       customer.address?.line2   || undefined,
-          city:        customer.address?.city    || '',
-          postal_code: customer.address?.zip     || '',
-          country:     customer.address?.country || 'US',
-        },
+    // Also save the card for future off-session rebills:
+    // setupFutureUsage on the plan/checkout enables setup_intent.succeeded
+    // webhook with the payment_method_id.
+    const r = await fetch('https://api.whop.com/api/v2/checkout_sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${WHOP_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        plan_id: WHOP_PLAN_ID,
+        redirect_url: RETURN_URL,
         metadata: {
-          product_color: product?.color || '',
-          product_size:  product?.size  || '',
+          customer_email: customer.email,
+          customer_name:  `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
+          customer_phone: customer.phone || '',
+          address_line1:  customer.address?.line1 || '',
+          address_line2:  customer.address?.line2 || '',
+          address_city:   customer.address?.city || '',
+          address_zip:    customer.address?.zip || '',
+          address_country: customer.address?.country || 'US',
+          product_color:  product?.color || '',
+          product_size:   product?.size || '',
         },
-      });
+      }),
+    });
+
+    const data = await r.json();
+
+    if (!r.ok) {
+      console.error('Whop checkout session error:', data);
+      return res.status(500).json({ error: data?.error || data?.message || 'Failed to create checkout session' });
     }
 
-    // IMPORTANT: do NOT use automatic_payment_methods with Apple Pay
-    // Use payment_method_types: ['card'] so confirmCardPayment works
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount:               amount,
-      currency:             currency || 'usd',
-      customer:             stripeCustomer.id,
-      payment_method_types: ['card'],
-      setup_future_usage:   'off_session',
-      metadata: {
-        customer_name:  `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
-        customer_email: customer.email,
-        product_color:  product?.color || '',
-        product_size:   product?.size  || '',
-      },
-    });
-
-    return res.status(200).json({
-      client_secret: paymentIntent.client_secret,
-      customer_id:   stripeCustomer.id,
-    });
+    return res.status(200).json({ session_id: data.id });
 
   } catch (err) {
-    console.error('Stripe error:', err.message);
+    console.error('Whop error:', err.message);
     return res.status(500).json({ error: err.message });
   }
 };
