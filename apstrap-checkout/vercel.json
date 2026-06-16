@@ -6,6 +6,10 @@
       "dest": "/api/checkout.js"
     },
     {
+      "src": "/api/whop-webhook",
+      "dest": "/api/whop-webhook.js"
+    },
+    {
       "src": "/api/admin",
       "dest": "/api/admin.js"
     },
